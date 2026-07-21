@@ -22,6 +22,7 @@ def initialize(context):
     context.z_window = 20 # used for zscore calculation, must be <= lookback
     
     context.target_weights = pd.Series(index=context.stocks, data=0.25)
+    # This says each of the four stocks initially has a target portfolio weight of 25%. In practice, later logic overwrites these weights based on pair signals.
     
     context.spread = np.ndarray((context.num_pairs, 0))
     context.inLong = [False] * context.num_pairs
@@ -36,7 +37,7 @@ def handle_data(context, data):
     pass
 
 def check_pair_status(context, data):
-    
+    # It asks for 35 days of daily prices, then keeps only the last context.lookback rows. Since lookback = 20, it keeps the most recent 20 days.
     prices = data.history(context.stocks, 'price', 35, '1d').iloc[-context.lookback::]
     
     new_spreads = np.ndarray((context.num_pairs, 1))
@@ -65,6 +66,7 @@ def check_pair_status(context, data):
 
             zscore = (spreads[-1] - spreads.mean()) / spreads.std()
 
+            ## Exit Rules
             if context.inShort[i] and zscore < 0.0:
                 context.target_weights[stock_y] = 0
                 context.target_weights[stock_x] = 0
@@ -76,6 +78,7 @@ def check_pair_status(context, data):
                 allocate(context, data)
                 return
 
+            ## Exit Rules
             if context.inLong[i] and zscore > 0.0:
                 context.target_weights[stock_y] = 0
                 context.target_weights[stock_x] = 0
@@ -88,6 +91,7 @@ def check_pair_status(context, data):
                 allocate(context, data)
                 return
 
+            # Entry Rule: Long Spread
             if zscore < -1.0 and (not context.inLong[i]):
                 # Only trade if NOT already in a trade 
                 y_target_shares = 1
@@ -105,6 +109,7 @@ def check_pair_status(context, data):
                 return
                 
 
+            # Entry Rule: Short Spread
             if zscore > 1.0 and (not context.inShort[i]):
                 # Only trade if NOT already in a trade
                 y_target_shares = -1
